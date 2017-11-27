@@ -20,7 +20,8 @@ function blob(exp) {
 	this.clusterList	= [];
 	this.xTimes			= 0;
 	this.add			= 0;
-	this.stepHolder		= [];
+	this.stepHolderNL	= [];
+	this.stepHolderL	= [];
 	this.valid			= true;
 	this.multiply		= function(i) {
 		var indexA	= i;
@@ -126,7 +127,7 @@ function blob(exp) {
 					this.clusterList.splice(j, 1);
 					this.clusterList.splice(i, 1);
 					this.clusterList.push(newBlob);
-					this.stepHolder.push(archiveClusterList);
+					this.stepHolderL.push(archiveClusterList);
 					this.calcLinear();
 					break ;
 				}
@@ -153,7 +154,7 @@ function blob(exp) {
 			{
 				newCluster.push(newBlob);
 				this.clusterList = newCluster.concat(this.clusterList.slice(i + 1));
-				this.stepHolder.push(archiveClusterList);
+				this.stepHolderNL.push(archiveClusterList);
 				this.calcNonLinear();
 			}
 			i++;
@@ -321,7 +322,8 @@ function solver(expression) {
 	this.expression = expression.trim();
 	this.reducedForm = null;
 	this.discriminant = null;
-	this.stepHolder = [];
+	this.stepHolderNL = [];
+	this.stepHolderL = [];
 	this.leftHand = null;
 	this.rightHand = null;
 	this.checkExpression = function() {
@@ -400,7 +402,7 @@ function solver(expression) {
 			heighestPow = this.leftHand.clusterList[i].pow > heighestPow ? this.leftHand.clusterList[i].pow : heighestPow;
 			lowestPow = this.leftHand.clusterList[i].pow < lowestPow ? this.leftHand.clusterList[i].pow : lowestPow;
 		}
-		if (heighestPow <= 2 && lowestPow > 0)
+		if (heighestPow === 2 && lowestPow > 0)
 			this.solve2ndDegree();
 	}
 	this.solve2ndDegree = function() {
@@ -439,6 +441,22 @@ function solver(expression) {
 			succLog('-> : ' + solution);
 		}
 	}
+	this.displayHistory = function() {
+		var i = 0;//leftHandNlIndex
+		var j = 1;//rightHandNlIndex
+
+		while (i < this.leftHand.stepHolderNL.length)
+		{
+			succLog(this.leftHand.logClusters(this.leftHand.stepHolderNL[i]) + ' = ' + this.rightHand.logClusters(this.rightHand.stepHolderNL[0] || this.rightHand.stepHolderL[0] || this.rightHand.clusterList));
+			i++;
+		}
+		i = i === 0 ? 0 : i - 1;
+		while (j < this.rightHand.stepHolderNL.length)
+		{
+			succLog(this.leftHand.logClusters(this.leftHand.stepHolderNL[i]) + ' = ' + this.rightHand.logClusters(this.rightHand.stepHolderNL[j]));
+			j++;
+		}
+	}
 	return (this);
 }
 
@@ -452,6 +470,7 @@ for (var s = 0; s < context.length; s++)
 		continue ;
 	if (eq.simplify() === null)
 		continue ;
+	eq.displayHistory();
 	if (eq.getReducedForm() === null)
 		continue ;
 	if (eq.findApplyableResolve() === null)

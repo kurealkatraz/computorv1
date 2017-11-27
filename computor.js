@@ -12,7 +12,7 @@ function warnLog(str) {
 }
 
 function succLog(str) {
-	console.log(chalk.bgGreen(chalk.white('[SUC]' + str)));
+	console.log(chalk.green('[SUC] ') + str);
 }
 
 function blob(exp) {
@@ -49,7 +49,10 @@ function blob(exp) {
 			else
 				merged.pow = a.pow > b.pow ? a.pow : b.pow;
 		}
-		return (merged);
+		if (merged.value !== null)
+			return (merged);
+		else
+			return (null);
 	}
 	this.divide = function(i) {
 		var indexA	= i;
@@ -78,79 +81,77 @@ function blob(exp) {
 			else
 				merged.pow = a.pow > b.pow ? a.pow : b.pow;
 		}
-		return (merged);
+		if (merged.value !== null)
+			return (merged);
+		else
+			return (null);
 	}
-	this.subOrAdd		= function(i) {
-		var indexA	= i;
-		var indexB	= i + 1;
+	this.subOrAdd		= function(indexA, indexB) {
 		var a		= this.clusterList[indexA];
 		var b		= this.clusterList[indexB];
 		var merged	= {
-			'sign'	: a.sign,
+			'sign'	: null,
 			'value'	: null,
 			'isX'	: a.isX || b.isX,
 			'pow'	: a.pow
 		};
 
+		if (a.sign.match(/[\/\*]/gi) !== null || b.sign.match(/[\/\*]/gi) !== null)
+			return (null);
 		if (a.isX && b.isX && a.pow === b.pow)
-			merged.value = a.sign === '-' ? -a.value : a.value + b.sign === '-' ? -b.value : b.value;
+			merged.value = (a.sign === '-' ? -a.value : a.value) + (b.sign === '-' ? -b.value : b.value);
 		else if (!a.isX && !b.isX)
-			merged.value = Math.pow(a.sign === '-' ? -a.value : a.value) + Math.pow(b.sign === '-' ? -b.value : b.value);
-		if (merged.value)
+			merged.value = Math.pow(a.sign === '-' ? -a.value : a.value, a.pow) + Math.pow(b.sign === '-' ? -b.value : b.value, b.pow);
+		merged.sign = merged.value >= 0 ? '+' : '-';
+		if (merged.value !== null)
+		{
+			merged.value = Math.abs(merged.value);
 			return (merged);
+		}
 		else
 			return (null);
 	}
 	this.calcLinear		= function() {
 		var archiveClusterList	= this.clusterList.slice(0);
 		var newCluster			= [];
-		var i					= 0;
 		var newBlob				= {};
 
-		while (i < this.clusterList.length)
+		for (var i = 0; i < this.clusterList.length; i++)
 		{
-			newBlob = {};
-			if (this.clusterList[i + 1] && this.clusterList[i + 1].sign.match(/[\+\-]/gi) !== null)
+			for (var j = i + 1; j < this.clusterList.length; j++)
 			{
-				newBlob = this.subOrAdd(i++);
+				newBlob = this.subOrAdd(i, j);
 				if (newBlob)
 				{
-					newCluster.push(newBlob);
-					this.clusterList = newCluster.concat(this.clusterList.slice(i + 1));
+					this.clusterList.splice(j, 1);
+					this.clusterList.splice(i, 1);
+					this.clusterList.push(newBlob);
 					this.stepHolder.push(archiveClusterList);
 					this.calcLinear();
+					break ;
 				}
-				else
-					newCluster.push(this.clusterList[i]);
 			}
-			else
-				newCluster.push(this.clusterList[i]);
-			i++;
 		}
 	}
 	this.calcNonLinear	= function() {
 		var archiveClusterList	= this.clusterList.slice(0);
 		var newCluster			= [];
+		var newBlob				= null;
 		var i					= 0;
 		var changeApplied		= false;
 
 		while (i < this.clusterList.length)
 		{
-			changeApplied = false;
+			newBlob = null;
 			if (this.clusterList[i + 1] && this.clusterList[i + 1].sign === '*')
-			{
-				newCluster.push(this.multiply(i++));
-				changeApplied = true;
-			}
+				newBlob = this.multiply(i++);
 			else if (this.clusterList[i + 1] && this.clusterList[i + 1].sign === '/')
-			{
-				newCluster.push(this.divide(i++));
-				changeApplied = true;
-			}
+				newBlob = this.divide(i++);
 			else
 				newCluster.push(this.clusterList[i]);
-			if (changeApplied === true)
+			if (newBlob !== null)
 			{
+				newCluster.push(newBlob);
 				this.clusterList = newCluster.concat(this.clusterList.slice(i + 1));
 				this.stepHolder.push(archiveClusterList);
 				this.calcNonLinear();
@@ -165,10 +166,10 @@ function blob(exp) {
 			clusterList = this.clusterList;
 		for (var s = 0; s < clusterList.length; s++)
 		{
-			if (s === 0 && clusterList[s].sign.match(/\-\/\*/) !== null)
-				formatedExpression += clusterList[s].sign + ' ';
+			if (s === 0 && clusterList[s].sign !== '+')
+				formatedExpression += clusterList[s].sign;
 			else if (s !== 0)
-				formatedExpression += clusterList[s].sign + ' ';
+				formatedExpression += clusterList[s].sign  + ' ';
 			if (clusterList[s].pow == 0)
 			{
 				formatedExpression = 1 + ' ';
@@ -209,14 +210,19 @@ function blob(exp) {
 			'isX'	: false
 		}
 
+		this.exp = this.exp.trim();
 		if (this.exp[index].match(/[\*\/]/gi) !== null && index === 0)
 		{
-			alertLog('Unexpected token at collumn ' + index);
+			alertLog('00 Unexpected token at collumn ' + index);
 			this.valid = false;
 			return (this.exp.length);
 		}
 		if (this.exp[index].match(/[\-\+\/\*]/gi) !== null)
+		{
+			if (this.exp[index] === '-')
+				retObj.sign = '-';
 			index++;
+		}
 		for (var s = index; s < this.exp.length; s++)
 		{
 			if (this.exp[s].match(/[0-9\.]/) !== null)
@@ -226,7 +232,7 @@ function blob(exp) {
 
 				if (counting === false)
 				{
-					alertLog('Unexpected token at collumn ' + s);
+					alertLog('01 Unexpected token at collumn ' + s);
 					this.valid = false;
 					return (this.exp.length);
 				}
@@ -249,27 +255,29 @@ function blob(exp) {
 					else
 					{
 						s = i - 1;
-						break;
+						counting = false;
+						break ;
 					}
 				}
+				s = i - 1;
 				counting = false;
 			}
 			else if (this.exp[s].match(/[\+\-\*\/]/gi) !== null)
 			{
 				if (counting === true && retObj.isX === false)
 				{
-					alertLog('Unexpected token at collumn ' + s);
+					alertLog('02 Unexpected token at collumn ' + s);
 					this.valid = false;
 					return (this.exp.length);
 				}
 				this.clusterList.push(retObj);
 				return (s);
 			}
-			else if (this.exp[s].match(/x/gi) !== null)
+			else if (this.exp[s].match(/[xX]/gi) !== null)
 			{
 				if (retObj.isX === true)
 				{
-					alertLog('Unexpected token at collumn ' + s);
+					alertLog('03 Unexpected token at collumn ' + s);
 					this.valid = false;
 					return (this.exp.length);
 				}
@@ -281,7 +289,7 @@ function blob(exp) {
 
 				if (countingPower === false)
 				{
-					alertLog('Unexpected token at collumn ' + s);
+					alertLog('04 Unexpected token at collumn ' + s);
 					this.valid = false;
 					return (this.exp.length);					
 				}
@@ -291,16 +299,13 @@ function blob(exp) {
 						pValue = (pValue * 10) + Number(this.exp[i]);
 					else
 					{
-						if (i === s)
-						{
-							alertLog('Unexpected token at collumn ' + s);
-							this.valid = false;
-							return (this.exp.length);
-						}
-						s = i;
+						retObj.pow = pValue;
+						countingPower = false;
+						s = i - 1;
 						break ;
 					}
 				}
+				s = i;
 				retObj.pow = pValue;
 				countingPower = false;
 			}
@@ -320,7 +325,7 @@ function solver(expression) {
 	this.leftHand = null;
 	this.rightHand = null;
 	this.checkExpression = function() {
-		const	acceptableCharReg	= new RegExp(/[0-9xX\s\+\-\*\/.\=\^]/gi);
+		const	acceptableCharReg	= new RegExp(/[0-9xX\s\+\-\*\/.\=\^ ]/gi);
 		var		hasLeftHand			= false;
 		var		hasRightHand		= false;
 		var		hasEqual			= false;
@@ -362,8 +367,6 @@ function solver(expression) {
 	this.simplify = function() {
 		this.leftHand.calcNonLinear();
 		this.rightHand.calcNonLinear();
-		console.log(this.leftHand.logClusters())
-		console.log(this.rightHand.logClusters())
 		this.leftHand.calcLinear();
 		this.rightHand.calcLinear();
 	}
@@ -376,6 +379,65 @@ function solver(expression) {
 		this.rightHand = new blob(rigthHandExp);
 		if (this.leftHand.valid !== true || this.rightHand.valid !== true)
 			return (null);
+	}
+	this.getReducedForm = function() {
+		var reverso = {'+' : '-', '-' : '+', '/' : '*', '*' : '/'};
+
+		for (var i = 0; i < this.rightHand.clusterList.length; i++)
+		{
+			this.rightHand.clusterList[i].sign = reverso[this.rightHand.clusterList[i].sign];
+			this.leftHand.clusterList.push(this.rightHand.clusterList[i]);
+		}
+		this.rightHand.clusterList = [{value : 0, pow : 1, sign : '+', isX : false}];
+		this.simplify();
+	}
+	this.findApplyableResolve = function() {
+		var heighestPow	= 1;
+		var lowestPow	= 1;
+
+		for (var i = 0; i < this.leftHand.clusterList.length; i++)
+		{
+			heighestPow = this.leftHand.clusterList[i].pow > heighestPow ? this.leftHand.clusterList[i].pow : heighestPow;
+			lowestPow = this.leftHand.clusterList[i].pow < lowestPow ? this.leftHand.clusterList[i].pow : lowestPow;
+		}
+		if (heighestPow <= 2 && lowestPow > 0)
+			this.solve2ndDegree();
+	}
+	this.solve2ndDegree = function() {
+		var a = 0;
+		var b = 0;
+		var c = 0;
+		var delta = null;
+
+		for (var i = 0; i < this.leftHand.clusterList.length; i++)
+		{
+			if (this.leftHand.clusterList[i].pow === 2 && this.leftHand.clusterList[i].isX === true)
+				a = Number(this.leftHand.clusterList[i].sign + this.leftHand.clusterList[i].value);
+			else if (this.leftHand.clusterList[i].pow === 1 && this.leftHand.clusterList[i].isX === true)
+				b = Number(this.leftHand.clusterList[i].sign + this.leftHand.clusterList[i].value);
+			else
+				c = Number(this.leftHand.clusterList[i].sign + this.leftHand.clusterList[i].value);
+		}
+		delta = Math.pow(b, 2) - (4 * a * c);
+		if (delta > 0)
+		{
+			var x1 = (-b + Math.sqrt(delta)) / (2 * a);
+			var x2 = (-b - Math.sqrt(delta)) / (2 * a);
+
+			succLog('Delta is positif (' + delta + ')');
+			succLog('X has two solutions :');
+			succLog('-> : ' + x1);
+			succLog('-> : ' + x2);
+		}
+		else if (delta < 0)
+			warnLog('Delta is negatif (' + delta + ')\nCan\'t solve this :(')
+		else
+		{
+			var solution = -(b / (2 * a));
+
+			succLog('X has a single solution')
+			succLog('-> : ' + solution);
+		}
 	}
 	return (this);
 }
@@ -390,6 +452,8 @@ for (var s = 0; s < context.length; s++)
 		continue ;
 	if (eq.simplify() === null)
 		continue ;
-	console.log(eq.leftHand.logClusters());
-	console.log(eq.rightHand.logClusters());
+	if (eq.getReducedForm() === null)
+		continue ;
+	if (eq.findApplyableResolve() === null)
+		continue ;
 }

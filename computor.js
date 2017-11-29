@@ -23,6 +23,13 @@ function blob(exp) {
 	this.stepHolderNL	= [];
 	this.stepHolderL	= [];
 	this.valid			= true;
+	this.powAjust		= function(i) {
+		if (!this.clusterList[i].isX && this.clusterList[i].pow > 0)
+		{
+			this.clusterList[i].value = Math.pow(this.clusterList[i].value, this.clusterList[i].pow);
+			this.clusterList[i].pow = 1;
+		}
+	}
 	this.multiply		= function(i) {
 		var indexA	= i;
 		var indexB	= i + 1;
@@ -35,18 +42,11 @@ function blob(exp) {
 			'pow'	: null
 		};
 
-		if (a.isX && b.isX && a.pow === 1 && b.pow === 1)
-			merged.pow = 2;
 		if (a.pow === 1 || b.pow === 1)
 		{
 			merged.value = a.value * b.value;
-			if (a.pow + b.pow === 3)
-				merged.pow = 2;
-			else if (a.pow + b.pow < 2)
-			{
-				merged.pow = 1;
-				alertLog("Power multipliying");
-			}
+			if (a.isX && b.isX)
+				merged.pow = a.pow + b.pow
 			else
 				merged.pow = a.pow > b.pow ? a.pow : b.pow;
 		}
@@ -67,18 +67,11 @@ function blob(exp) {
 			'pow'	: null
 		};
 
-		if (a.isX && b.isX && a.pow === 1 && b.pow === 1)
-			merged.pow = 2;
 		if (a.pow === 1 || b.pow === 1)
 		{
 			merged.value = a.value / b.value;
 			if (a.pow + b.pow === 3)
 				merged.pow = 2;
-			else if (a.pow + b.pow < 2)
-			{
-				merged.pow = 1;
-				alertLog("Power dividing");
-			}
 			else
 				merged.pow = a.pow > b.pow ? a.pow : b.pow;
 		}
@@ -129,6 +122,7 @@ function blob(exp) {
 					this.clusterList.push(newBlob);
 					this.stepHolderL.push(archiveClusterList);
 					this.calcLinear();
+					succLog(eq.leftHand.logClusters() + ' = ' + eq.rightHand.logClusters())
 					break ;
 				}
 			}
@@ -156,6 +150,7 @@ function blob(exp) {
 				this.clusterList = newCluster.concat(this.clusterList.slice(i + 1));
 				this.stepHolderNL.push(archiveClusterList);
 				this.calcNonLinear();
+				succLog(eq.leftHand.logClusters() + ' = ' + eq.rightHand.logClusters());
 			}
 			i++;
 		}
@@ -303,12 +298,23 @@ function blob(exp) {
 						retObj.pow = pValue;
 						countingPower = false;
 						s = i - 1;
+						if (!retObj.isX)
+						{
+							retObj.value = Math.pow(retObj.value, retObj.pow)
+							retObj.pow = 1;
+						}
 						break ;
 					}
 				}
 				s = i;
 				retObj.pow = pValue;
 				countingPower = false;
+				if (!retObj.isX)
+				{
+					retObj.value = Math.pow(retObj.value, retObj.pow)
+					retObj.pow = 1;
+				}
+				break ;
 			}
 		}
 		this.clusterList.push(retObj)
@@ -391,6 +397,7 @@ function solver(expression) {
 			this.leftHand.clusterList.push(this.rightHand.clusterList[i]);
 		}
 		this.rightHand.clusterList = [{value : 0, pow : 1, sign : '+', isX : false}];
+		succLog(eq.leftHand.logClusters() + ' = ' + eq.rightHand.logClusters());
 		this.simplify();
 	}
 	this.findApplyableResolve = function() {
@@ -404,6 +411,29 @@ function solver(expression) {
 		}
 		if (heighestPow === 2 && lowestPow > 0)
 			this.solve2ndDegree();
+		else if (heighestPow === 1 && lowestPow > 0)
+			this.solveFirstDegree();
+		else
+			warnLog('There is no appropriate resolver for this type of equation');
+	}
+	this.solveFirstDegree = function() {
+		var a = 0;
+		var b = 0;
+		var x = 0;
+
+		for (var i = 0; i < this.leftHand.clusterList.length; i++)
+		{
+			if (this.leftHand.clusterList[i].isX === true)
+				a += Number(this.leftHand.clusterList[i].sign + this.leftHand.clusterList[i].value);
+			else
+			{
+				b += Number(this.leftHand.clusterList[i].sign + this.leftHand.clusterList[i].value);
+			}
+		}
+		succLog('x = -(' + b + ') / ' + a);
+		x = -b / a;
+		succLog('X has a single solution')
+		succLog('-> : ' + x);
 	}
 	this.solve2ndDegree = function() {
 		var a = 0;
@@ -441,22 +471,6 @@ function solver(expression) {
 			succLog('-> : ' + solution);
 		}
 	}
-	this.displayHistory = function() {
-		var i = 0;//leftHandNlIndex
-		var j = 1;//rightHandNlIndex
-
-		while (i < this.leftHand.stepHolderNL.length)
-		{
-			succLog(this.leftHand.logClusters(this.leftHand.stepHolderNL[i]) + ' = ' + this.rightHand.logClusters(this.rightHand.stepHolderNL[0] || this.rightHand.stepHolderL[0] || this.rightHand.clusterList));
-			i++;
-		}
-		i = i === 0 ? 0 : i - 1;
-		while (j < this.rightHand.stepHolderNL.length)
-		{
-			succLog(this.leftHand.logClusters(this.leftHand.stepHolderNL[i]) + ' = ' + this.rightHand.logClusters(this.rightHand.stepHolderNL[j]));
-			j++;
-		}
-	}
 	return (this);
 }
 
@@ -468,9 +482,9 @@ for (var s = 0; s < context.length; s++)
 		continue ;
 	if (eq.genClusters() === null)
 		continue ;
+	succLog(eq.leftHand.logClusters() + ' = ' + eq.rightHand.logClusters())
 	if (eq.simplify() === null)
 		continue ;
-	eq.displayHistory();
 	if (eq.getReducedForm() === null)
 		continue ;
 	if (eq.findApplyableResolve() === null)

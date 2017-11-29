@@ -42,14 +42,18 @@ function blob(exp) {
 			'pow'	: null
 		};
 
-		if (a.pow === 1 || b.pow === 1)
+		merged.value = a.value * b.value;
+		if (a.isX && b.isX)
 		{
-			merged.value = a.value * b.value;
-			if (a.isX && b.isX)
-				merged.pow = a.pow + b.pow
-			else
-				merged.pow = a.pow > b.pow ? a.pow : b.pow;
+			merged.pow = a.pow + b.pow;
+			if (merged.value === 0)
+			{
+				merged.pow = 1;
+				merged.isX = false;
+			}
 		}
+		else
+			merged.pow = a.isX ? a.pow : b.pow;
 		if (merged.value !== null)
 			return (merged);
 		else
@@ -67,14 +71,20 @@ function blob(exp) {
 			'pow'	: null
 		};
 
-		if (a.pow === 1 || b.pow === 1)
+		merged.value = a.value / b.value;
+		if (a.isX && b.isX)
 		{
-			merged.value = a.value / b.value;
-			if (a.pow + b.pow === 3)
-				merged.pow = 2;
-			else
-				merged.pow = a.pow > b.pow ? a.pow : b.pow;
+			merged.pow = a.pow - b.pow;
+			if (merged.value === 0)
+			{
+				merged.pow = 1;
+				merged.isX = false;
+			}
 		}
+		else if (b.isX)
+			return (null);
+		else
+			merged.pow = a.isX ? a.pow : b.pow;
 		if (merged.value !== null)
 			return (merged);
 		else
@@ -87,13 +97,22 @@ function blob(exp) {
 			'sign'	: null,
 			'value'	: null,
 			'isX'	: a.isX || b.isX,
-			'pow'	: a.pow
+			'pow'	: 1
 		};
 
+		if (this.clusterList[indexB + 1] && this.clusterList[indexB + 1].sign.match(/[\/\*]/) !== null)
+			return (null);
 		if (a.sign.match(/[\/\*]/gi) !== null || b.sign.match(/[\/\*]/gi) !== null)
 			return (null);
 		if (a.isX && b.isX && a.pow === b.pow)
+		{
 			merged.value = (a.sign === '-' ? -a.value : a.value) + (b.sign === '-' ? -b.value : b.value);
+			if (merged.value === 0)
+			{
+				merged.pow = 1;
+				merged.isX = false;
+			}
+		}
 		else if (!a.isX && !b.isX)
 			merged.value = Math.pow(a.sign === '-' ? -a.value : a.value, a.pow) + Math.pow(b.sign === '-' ? -b.value : b.value, b.pow);
 		merged.sign = merged.value >= 0 ? '+' : '-';
@@ -103,7 +122,9 @@ function blob(exp) {
 			return (merged);
 		}
 		else
+		{
 			return (null);
+		}
 	}
 	this.calcLinear		= function() {
 		var archiveClusterList	= this.clusterList.slice(0);
@@ -118,11 +139,10 @@ function blob(exp) {
 				if (newBlob)
 				{
 					this.clusterList.splice(j, 1);
-					this.clusterList.splice(i, 1);
-					this.clusterList.push(newBlob);
+					this.clusterList[i] = newBlob;
 					this.stepHolderL.push(archiveClusterList);
-					this.calcLinear();
 					succLog(eq.leftHand.logClusters() + ' = ' + eq.rightHand.logClusters())
+					this.calcLinear();
 					break ;
 				}
 			}
@@ -174,7 +194,7 @@ function blob(exp) {
 			formatedExpression += clusterList[s].value
 			if (clusterList[s].isX)
 				formatedExpression += 'x';
-			if (clusterList[s].pow > 1)
+			if (clusterList[s].pow !== 0 && clusterList[s].pow !== 1)
 				formatedExpression += '^' + clusterList[s].pow + ' '
 			else
 				formatedExpression += ' ';
@@ -200,7 +220,7 @@ function blob(exp) {
 		var countingPower	= true;
 		var endIndex		= 0;
 		var retObj			= {
-			'value'	: 0,
+			'value'	: null,
 			'pow'	: 1,
 			'sign'	: this.exp[index].match(/[\+\-\*\/]/gi) !== null ? this.exp[index] : '+',
 			'isX'	: false
@@ -277,11 +297,14 @@ function blob(exp) {
 					this.valid = false;
 					return (this.exp.length);
 				}
+				if (retObj.value === null)
+					retObj.value = 1;
 				retObj.isX = true;
 			}
 			else if (this.exp[s] === '^')
 			{
 				var pValue = 0;
+				var isNeg = false;
 
 				if (countingPower === false)
 				{
@@ -293,17 +316,36 @@ function blob(exp) {
 				{
 					if (this.exp[i].match(/[0-9]/) !== null)
 						pValue = (pValue * 10) + Number(this.exp[i]);
+					else if (this.exp[i] === '-')
+						isNeg = true;
 					else
 					{
 						retObj.pow = pValue;
 						countingPower = false;
-						s = i - 1;
+						s = i;
 						if (!retObj.isX)
 						{
 							retObj.value = Math.pow(retObj.value, retObj.pow)
 							retObj.pow = 1;
 						}
-						break ;
+						if (isNeg && retObj.isX)
+						{
+							this.clusterList.push({
+								'value'	: retObj.value,
+								'pow'	: 1,
+								'sign'	: retObj.sign,
+								'isX'	: false
+							});
+							this.clusterList.push({
+								'value'	: 1,
+								'pow'	: retObj.pow,
+								'sign'	: '/',
+								'isX'	: true
+							});
+						}
+						else
+							this.clusterList.push(retObj);
+						return (s);
 					}
 				}
 				s = i;
@@ -314,7 +356,24 @@ function blob(exp) {
 					retObj.value = Math.pow(retObj.value, retObj.pow)
 					retObj.pow = 1;
 				}
-				break ;
+				if (isNeg && retObj.isX)
+				{
+					this.clusterList.push({
+						'value'	: retObj.value,
+						'pow'	: 1,
+						'sign'	: retObj.sign,
+						'isX'	: false
+					});
+					this.clusterList.push({
+						'value'	: 1,
+						'pow'	: retObj.pow,
+						'sign'	: '/',
+						'isX'	: true
+					});
+				}
+				else
+					this.clusterList.push(retObj);
+				return (s);
 			}
 		}
 		this.clusterList.push(retObj)
@@ -334,6 +393,7 @@ function solver(expression) {
 	this.rightHand = null;
 	this.checkExpression = function() {
 		const	acceptableCharReg	= new RegExp(/[0-9xX\s\+\-\*\/.\=\^ ]/gi);
+		//const	acceptableCharReg	= new RegExp(/[0-9xX\s\+\-\*.\=\^ ]/gi);
 		var		hasLeftHand			= false;
 		var		hasRightHand		= false;
 		var		hasEqual			= false;
@@ -389,7 +449,7 @@ function solver(expression) {
 			return (null);
 	}
 	this.getReducedForm = function() {
-		var reverso = {'+' : '-', '-' : '+', '/' : '*', '*' : '/'};
+		var reverso = {'+' : '-', '-' : '+', '/' : '/', '*' : '*'};
 
 		for (var i = 0; i < this.rightHand.clusterList.length; i++)
 		{
@@ -406,6 +466,14 @@ function solver(expression) {
 
 		for (var i = 0; i < this.leftHand.clusterList.length; i++)
 		{
+			if (this.leftHand.clusterList[i].sign === '/')
+			{
+				for (var j = 0; j < this.leftHand.clusterList.length; j++)
+				{
+					//check if oposite is present, then remove if found, return after re-launching :)
+				}
+				return ()
+			}
 			heighestPow = this.leftHand.clusterList[i].pow > heighestPow ? this.leftHand.clusterList[i].pow : heighestPow;
 			lowestPow = this.leftHand.clusterList[i].pow < lowestPow ? this.leftHand.clusterList[i].pow : lowestPow;
 		}

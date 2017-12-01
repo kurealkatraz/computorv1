@@ -1,3 +1,15 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   computor.js                                        :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: mgras <mgras@student.42.fr>                +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2017/11/29 21:07:29 by mgras             #+#    #+#             */
+/*   Updated: 2017/12/01 10:05:04 by mgras            ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 var globalBs = 0;
 const chalk		= require('chalk');
 const args		= process.argv;
@@ -461,25 +473,23 @@ function solver(expression) {
 		this.simplify();
 	}
 	this.findApplyableResolve = function() {
-		var heighestPow	= 1;
-		var lowestPow	= 1;
+		var heighestPow		= 1;
+		var lowestPow		= 1;
+		var nonLinear		= false;
 
 		for (var i = 0; i < this.leftHand.clusterList.length; i++)
 		{
-			if (this.leftHand.clusterList[i].sign === '/')
-			{
-				for (var j = 0; j < this.leftHand.clusterList.length; j++)
-				{
-					//check if oposite is present, then remove if found, return after re-launching :)
-				}
-				return ()
-			}
+			if (this.leftHand.clusterList[i].sign.match(/[\*\/]/gi) !== null)
+				nonLinear = true;
+			//check if oposite is present, then remove if found, return after re-launching :)
+			//What if user chains / or * after a / operator ?
+			//Ask Edouardo di caprio
 			heighestPow = this.leftHand.clusterList[i].pow > heighestPow ? this.leftHand.clusterList[i].pow : heighestPow;
 			lowestPow = this.leftHand.clusterList[i].pow < lowestPow ? this.leftHand.clusterList[i].pow : lowestPow;
 		}
-		if (heighestPow === 2 && lowestPow > 0)
+		if (heighestPow === 2 && lowestPow > 0 && !nonLinear)
 			this.solve2ndDegree();
-		else if (heighestPow === 1 && lowestPow > 0)
+		else if (heighestPow === 1 && lowestPow > 0 && !nonLinear)
 			this.solveFirstDegree();
 		else
 			warnLog('There is no appropriate resolver for this type of equation');

@@ -6,7 +6,7 @@
 /*   By: mgras <mgras@student.42.fr>                +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2017/11/29 21:07:29 by mgras             #+#    #+#             */
-/*   Updated: 2017/12/01 10:05:04 by mgras            ###   ########.fr       */
+/*   Updated: 2017/12/01 14:27:24 by mgras            ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -119,11 +119,13 @@ function blob(exp) {
 		if (a.isX && b.isX && a.pow === b.pow)
 		{
 			merged.value = (a.sign === '-' ? -a.value : a.value) + (b.sign === '-' ? -b.value : b.value);
-			if (merged.value === 0)
+			if (merged.value === 0 && a.pow !== 0)
 			{
 				merged.pow = 1;
 				merged.isX = false;
 			}
+			else
+				merged.pow = a.pow
 		}
 		else if (!a.isX && !b.isX)
 			merged.value = Math.pow(a.sign === '-' ? -a.value : a.value, a.pow) + Math.pow(b.sign === '-' ? -b.value : b.value, b.pow);
@@ -198,15 +200,10 @@ function blob(exp) {
 				formatedExpression += clusterList[s].sign;
 			else if (s !== 0)
 				formatedExpression += clusterList[s].sign  + ' ';
-			if (clusterList[s].pow == 0)
-			{
-				formatedExpression = 1 + ' ';
-				continue ;
-			}
 			formatedExpression += clusterList[s].value
 			if (clusterList[s].isX)
 				formatedExpression += 'x';
-			if (clusterList[s].pow !== 0 && clusterList[s].pow !== 1)
+			if (clusterList[s].isX)
 				formatedExpression += '^' + clusterList[s].pow + ' '
 			else
 				formatedExpression += ' ';
@@ -405,7 +402,6 @@ function solver(expression) {
 	this.rightHand = null;
 	this.checkExpression = function() {
 		const	acceptableCharReg	= new RegExp(/[0-9xX\s\+\-\*\/.\=\^ ]/gi);
-		//const	acceptableCharReg	= new RegExp(/[0-9xX\s\+\-\*.\=\^ ]/gi);
 		var		hasLeftHand			= false;
 		var		hasRightHand		= false;
 		var		hasEqual			= false;
@@ -452,11 +448,11 @@ function solver(expression) {
 	}
 	this.genClusters = function() {
 		var leftHandExp = (this.expression.split('='))[0];
-		var rigthHandExp = (this.expression.split('='))[1];
+		var rightHandExp = (this.expression.split('='))[1];
 		var fullEquation;
 
 		this.leftHand = new blob(leftHandExp);
-		this.rightHand = new blob(rigthHandExp);
+		this.rightHand = new blob(rightHandExp);
 		if (this.leftHand.valid !== true || this.rightHand.valid !== true)
 			return (null);
 	}
@@ -473,7 +469,7 @@ function solver(expression) {
 		this.simplify();
 	}
 	this.findApplyableResolve = function() {
-		var heighestPow		= 1;
+		var heighestPow		= 0;
 		var lowestPow		= 1;
 		var nonLinear		= false;
 
@@ -481,18 +477,34 @@ function solver(expression) {
 		{
 			if (this.leftHand.clusterList[i].sign.match(/[\*\/]/gi) !== null)
 				nonLinear = true;
-			//check if oposite is present, then remove if found, return after re-launching :)
-			//What if user chains / or * after a / operator ?
-			//Ask Edouardo di caprio
-			heighestPow = this.leftHand.clusterList[i].pow > heighestPow ? this.leftHand.clusterList[i].pow : heighestPow;
-			lowestPow = this.leftHand.clusterList[i].pow < lowestPow ? this.leftHand.clusterList[i].pow : lowestPow;
+			if (this.leftHand.clusterList[i].isX)
+			{
+				heighestPow = this.leftHand.clusterList[i].pow > heighestPow ? this.leftHand.clusterList[i].pow : heighestPow;
+				lowestPow = this.leftHand.clusterList[i].pow < lowestPow ? this.leftHand.clusterList[i].pow : lowestPow;
+			}
 		}
-		if (heighestPow === 2 && lowestPow > 0 && !nonLinear)
+		if (lowestPow === 0 && heighestPow !== 0)
+			this.removeNullPower();
+		if (heighestPow === 2 && lowestPow >= 0 && !nonLinear)
 			this.solve2ndDegree();
-		else if (heighestPow === 1 && lowestPow > 0 && !nonLinear)
+		else if (heighestPow === 1 && lowestPow >= 0 && !nonLinear)
 			this.solveFirstDegree();
+		else if (heighestPow === 0 && lowestPow === 0 && !nonLinear)
+			succLog('Tous les nombre réels sont solution');
 		else
 			warnLog('There is no appropriate resolver for this type of equation');
+	}
+	this.removeNullPower = function() {
+		for (var i = 0; i < this.leftHand.clusterList.length; i++)
+		{
+			if (this.leftHand.clusterList[i].isX && this.leftHand.clusterList[i].pow === 0)
+			{
+				this.leftHand.clusterList[i].value = 1;
+				this.leftHand.clusterList[i].pow = 1;
+				this.leftHand.clusterList[i].isX = false;
+			}
+		}
+		succLog(this.leftHand.logClusters());
 	}
 	this.solveFirstDegree = function() {
 		var a = 0;
@@ -504,9 +516,7 @@ function solver(expression) {
 			if (this.leftHand.clusterList[i].isX === true)
 				a += Number(this.leftHand.clusterList[i].sign + this.leftHand.clusterList[i].value);
 			else
-			{
 				b += Number(this.leftHand.clusterList[i].sign + this.leftHand.clusterList[i].value);
-			}
 		}
 		succLog('x = -(' + b + ') / ' + a);
 		x = -b / a;
@@ -549,6 +559,87 @@ function solver(expression) {
 			succLog('-> : ' + solution);
 		}
 	}
+	this.checkForInvalidReducingProcess = function() {
+		var left		= {};
+		var right		= {};
+		var rightL		= 0;
+		var leftL		= 0;
+		var leftTypes	= 0;
+		var rightTypes	= 0;
+
+		for (var i = 0; i < this.leftHand.clusterList.length; i++)
+		{
+			if (this.leftHand.clusterList[i].isX)
+			{
+				if (this.leftHand.clusterList[i].sign === '-')
+				{
+					if (left[this.leftHand.clusterList[i].pow.toString()])
+						left[this.leftHand.clusterList[i].pow.toString()] -= this.leftHand.clusterList[i].value;
+					else
+					{
+						leftTypes++;
+						left[this.leftHand.clusterList[i].pow.toString()] = this.leftHand.clusterList[i].value;
+					}
+				}
+				else if (this.leftHand.clusterList[i].sign === '+')
+				{
+					if (left[this.leftHand.clusterList[i].pow.toString()])
+						left[this.leftHand.clusterList[i].pow.toString()] += this.leftHand.clusterList[i].value;
+					else
+					{
+						leftTypes++;
+						left[this.leftHand.clusterList[i].pow.toString()] = this.leftHand.clusterList[i].value;
+					}
+				}
+			}
+			else
+			{
+				if (this.leftHand.clusterList[i].sign === '-')
+					leftL -= this.leftHand.clusterList[i].value;
+				else if (this.leftHand.clusterList[i].sign === '+')
+					leftL += this.leftHand.clusterList[i].value;
+			}
+		}
+		for (var i = 0; i < this.rightHand.clusterList.length; i++)
+		{
+			if (this.rightHand.clusterList[i].isX)
+			{
+				if (this.rightHand.clusterList[i].sign === '-')
+				{
+					if (right[this.rightHand.clusterList[i].pow.toString()])
+						right[this.rightHand.clusterList[i].pow.toString()] -= this.rightHand.clusterList[i].value;
+					else
+					{
+						rightTypes++;
+						right[this.rightHand.clusterList[i].pow.toString()] = this.rightHand.clusterList[i].value;
+					}
+				}
+				else if (this.rightHand.clusterList[i].sign === '+')
+				{
+					if (right[this.rightHand.clusterList[i].pow.toString()])
+						right[this.rightHand.clusterList[i].pow.toString()] += this.rightHand.clusterList[i].value;
+					else
+					{
+						rightTypes++;
+						right[this.rightHand.clusterList[i].pow.toString()] = this.rightHand.clusterList[i].value;
+					}
+				}
+			}
+			else
+			{
+				if (this.rightHand.clusterList[i].sign === '-')
+					rightL -= this.rightHand.clusterList[i].value;
+				else if (this.rightHand.clusterList[i].sign === '+')
+					rightL += this.rightHand.clusterList[i].value;
+			}
+		}
+		if (rightL !== leftL && rightTypes === 0 && leftTypes === 0)
+		{
+			alertLog("Cette equation semble être incorrecte :(");
+			return (null);
+		}
+		return (true);
+	}
 	return (this);
 }
 
@@ -562,6 +653,8 @@ for (var s = 0; s < context.length; s++)
 		continue ;
 	succLog(eq.leftHand.logClusters() + ' = ' + eq.rightHand.logClusters())
 	if (eq.simplify() === null)
+		continue ;
+	if (eq.checkForInvalidReducingProcess() === null)
 		continue ;
 	if (eq.getReducedForm() === null)
 		continue ;

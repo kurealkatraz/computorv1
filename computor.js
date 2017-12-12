@@ -6,7 +6,7 @@
 /*   By: mgras <mgras@student.42.fr>                +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2017/11/29 21:07:29 by mgras             #+#    #+#             */
-/*   Updated: 2017/12/01 14:27:24 by mgras            ###   ########.fr       */
+/*   Updated: 2017/12/12 12:22:49 by mgras            ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -499,7 +499,6 @@ function solver(expression) {
 		{
 			if (this.leftHand.clusterList[i].isX && this.leftHand.clusterList[i].pow === 0)
 			{
-				this.leftHand.clusterList[i].value = 1;
 				this.leftHand.clusterList[i].pow = 1;
 				this.leftHand.clusterList[i].isX = false;
 			}
@@ -532,12 +531,13 @@ function solver(expression) {
 		for (var i = 0; i < this.leftHand.clusterList.length; i++)
 		{
 			if (this.leftHand.clusterList[i].pow === 2 && this.leftHand.clusterList[i].isX === true)
-				a = Number(this.leftHand.clusterList[i].sign + this.leftHand.clusterList[i].value);
+				a += Number(this.leftHand.clusterList[i].sign + this.leftHand.clusterList[i].value);
 			else if (this.leftHand.clusterList[i].pow === 1 && this.leftHand.clusterList[i].isX === true)
-				b = Number(this.leftHand.clusterList[i].sign + this.leftHand.clusterList[i].value);
+				b += Number(this.leftHand.clusterList[i].sign + this.leftHand.clusterList[i].value);
 			else
-				c = Number(this.leftHand.clusterList[i].sign + this.leftHand.clusterList[i].value);
+				c += Number(this.leftHand.clusterList[i].sign + this.leftHand.clusterList[i].value);
 		}
+		console.log(a, b, c);
 		delta = Math.pow(b, 2) - (4 * a * c);
 		if (delta > 0)
 		{
